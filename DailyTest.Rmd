@@ -204,4 +204,4 @@ And finally, exporting just the image to show my dad:
 ggsave("DailyGuests1999-2014.png")
 ```
 
-And with all that, I think this has been a successful first project in getting back into R! :)
+And with all that, I think this has been a successful first project in getting back into R! 
