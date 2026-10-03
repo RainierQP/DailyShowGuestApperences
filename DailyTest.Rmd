@@ -1,0 +1,207 @@
+---
+title: "DailyTest"
+author: "Rainier Pederson"
+date: "2026-09-28"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(UsingR)
+```
+
+## 1. What categories are there?
+
+There are ways to check how many unique values there are in the Groups section of the data. None of them are as slow as trying to re-learn R from first principles, but none of them get me to re-learn R from first principles.
+
+To start, the table:
+
+```{r}
+jons_guest_list <- read.csv("C:/Users/Grad School/Desktop/RCode/Data/daily_show_guests.csv", 
+                            header = TRUE)
+head(jons_guest_list, 10)
+```
+
+With that code having run, we can see the types of data in the file:
+
+```{r}
+colnames(jons_guest_list)
+```
+
+From there, I'm interested in the Groups:
+
+```{r}
+jons_groups <- jons_guest_list$Group
+jons_groups <- as.data.frame(jons_groups)
+jons_groups <- distinct(jons_groups)
+jons_groups
+```
+
+Now we know what the different groups are. Yay!
+
+
+## 2. Plot change over time
+
+I don't care about any data beyond the year and group:
+
+```{r}
+jons_guest_list <- subset(jons_guest_list, select = c("YEAR", "Group"))
+head(jons_guest_list, 10)
+```
+
+Rotating that so we have a new in which each column is a year, each row is a profession (Group), and that intersection is how many of that profession Jon had on that year: 
+
+```{r}
+jons_guest_list <- count(jons_guest_list, Group, YEAR)
+#jons_guest_list
+# jons_guest_list <- pivot_wider(jons_guest_list, names_from = YEAR, 
+                               #values_from = n, values_fill = 0)
+
+head(jons_guest_list, 10)
+```
+
+So with all that done, I should be able to finally build this graph:
+
+```{r}
+ggplot(jons_guest_list, aes(fill=Group, y=n, x=YEAR)) + 
+    geom_bar(position="stack", stat="identity")
+```
+
+I skipped a data cleaning step earlier, so I'm making up for it now. Namely: 
+1. "N/A" indicates no guest should be discounted;
+2. "media" and "Media" should be the same under "Media";
+3. "Academic" and "Science" can be merged;
+4. "Advocacy", "Business", "Clergy", "Consultant", "Military", and "Political Aide" can all go under Misc.
+5. The chart should be normalized because if I'm comparing how popular politicians v comedians are, it isn't helpful to say they both went down in popularity by about half when Jon left the show halfway through the year. 
+6. The y-axis should be called something sensible.
+
+For the N/A:
+
+```{r}
+jons_guest_list <- filter(jons_guest_list, Group != "N/A")
+ggplot(jons_guest_list, aes(fill=Group, y=n, x=YEAR)) + 
+    geom_bar(position="stack", stat="identity")
+```
+
+
+For the rest, it's easier to just start with clean data
+
+```{r}
+jons_guest_list_2 <- read.csv("C:/Users/Grad School/Desktop/RCode/Data/daily_show_guests.csv", 
+                              header = TRUE)
+jons_guest_list_2 <- filter(jons_guest_list_2, Group != "N/A")
+jons_guest_list_2$Group[jons_guest_list_2$Group == "media"] <- 
+                                                   "Media"
+jons_guest_list_2$Group[jons_guest_list_2$Group == "Academic"] <-
+                                                   "Academic/Science"
+jons_guest_list_2$Group[jons_guest_list_2$Group == "Science"] <- 
+                                                   "Academic/Science"
+jons_guest_list_2$Group[jons_guest_list_2$Group == "Advocacy"] <- 
+                                                   "Misc"
+jons_guest_list_2$Group[jons_guest_list_2$Group == "Business"] <- 
+                                                   "Misc"
+jons_guest_list_2$Group[jons_guest_list_2$Group == "Clergy"] <- 
+                                                   "Misc"
+jons_guest_list_2$Group[jons_guest_list_2$Group == "Consultant"] <- 
+                                                   "Misc"
+jons_guest_list_2$Group[jons_guest_list_2$Group == "Military"] <- 
+                                                   "Misc"
+jons_guest_list_2$Group[jons_guest_list_2$Group == "Political Aide"] <- 
+                                                   "Misc"
+jons_guest_list_2 <- subset(jons_guest_list_2, select = c("YEAR", "Group"))
+jons_guest_list_2 <- count(jons_guest_list_2, Group, YEAR)
+
+ggplot(jons_guest_list_2, aes(fill=Group, y=n, x=YEAR)) +
+    geom_bar(position="fill", stat="identity")
+```
+
+So that's basically what I want. To make this a stacked line chart, and then add some custom coloring, and then actually deciding to not normalize the data:
+
+
+```{r}
+custom_colors = c("#d14d4b", "#ecb87c", "#a78c11", "#cfee51", "#629938", "#b5ffe1", "#2d7f91", "#9a92da", "#4a1554")
+
+ggplot(jons_guest_list_2, aes(fill=Group, y=n, x=YEAR)) +
+    geom_area() + 
+    labs(
+          title = "The Types of Guests on Jon Stwert's Daily Show Over Time",
+          subtitle = "Data procured from FiveThirtyEight",
+          caption = "Graph by Rainier Pederson. Data from FiveThirtyEight,\n 
+          found at https://github.com/fivethirtyeight/data/tree/master/daily-show-guests.\n 
+          Used under CC by 4.0.",
+          tag = waiver(),
+          dictionary = waiver(),
+          alt = waiver(),
+          alt_insight = waiver(),
+          x = "Year",
+          y = "Number of Guests"
+        ) +
+  scale_fill_manual(values = custom_colors)
+
+```
+
+There are weird jumps that correspond to a lack of data where data should have been set to 0. This wasn't caught in the bar graph stage because there it wouldn't have mattered. To clean that:
+
+```{r}
+head(jons_guest_list_2, 10)
+jons_guest_list_3 <- jons_guest_list_2
+jons_guest_list_2 <- pivot_wider(jons_guest_list_2, names_from = YEAR, 
+                                 values_from = n, values_fill = 0)
+jons_guest_list_2 <- pivot_longer(jons_guest_list_2, !Group, names_to = "YEAR")
+# print(as_tibble(jons_guest_list_2), n = 200)
+# Yes, the 0s are 
+
+# jons_guest_list_2 <- as.data.frame(jons_guest_list_2)
+jons_guest_list_2$YEAR <- as.integer(jons_guest_list_2$YEAR)
+
+ggplot(jons_guest_list_2, aes(fill=Group, y=value, x=YEAR)) +
+    geom_area() + 
+    labs(
+          title = "The Types of Guests on Jon Stwert's Daily Show Over Time",
+          subtitle = "Data procured from FiveThirtyEight",
+          caption = "Graph by Rainier Pederson. Data from FiveThirtyEight,\n found at https://github.com/fivethirtyeight/data/tree/master/daily-show-guests.\n Used under CC by 4.0.",
+          tag = waiver(),
+          dictionary = waiver(),
+          alt = waiver(),
+          alt_insight = waiver(),
+          x = "Year",
+          y = "Number of Guests"
+        ) +
+  scale_fill_manual(values = custom_colors)
+```
+
+That took a minute (week) to work. As it turns out, when jons_guest_list_2 was pivoting and un-pivoting, the YEAR went from int to char and that caused a whole bunch of problems. 
+
+Anyways, my last thing is to run the data but without including 2015 because visually, the sudden decrease is throwing me.
+
+```{r echo=FALSE}
+ggplot(filter(jons_guest_list_2, YEAR != 2015), aes(fill=Group, y=value, x=YEAR)) +
+    geom_area() + 
+    labs(
+          title = "The Types of Guests on Jon Stwert's Daily Show Over Time \n
+          From 1999-2014",
+          subtitle = "Data procured from FiveThirtyEight",
+          caption = "Graph by Rainier Pederson. Data from FiveThirtyEight,\n found at https://github.com/fivethirtyeight/data/tree/master/daily-show-guests.\n Used under CC by 4.0.",
+          tag = waiver(),
+          dictionary = waiver(),
+          alt = waiver(),
+          alt_insight = waiver(),
+          x = "Year",
+          y = "Number of Guests"
+        ) +
+  scale_fill_manual(values = custom_colors)
+```
+
+And finally, exporting just the image to show my dad:
+
+```{r}
+ggsave("DailyGuests1999-2014.png")
+```
+
+And with all that, I think this has been a successful first project in getting back into R! 
